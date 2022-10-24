@@ -28,7 +28,16 @@ type Step struct {
 			Description string `yaml:"description"`
 			From        string `yaml:"from"`
 			Steps       []struct {
-				Script *struct {
+				Env *struct {
+					Key   string `yaml:"key"`
+					Value string `yaml:"value"`
+				} `yaml:"env"`
+				Label *struct {
+					Key   string `yaml:"key"`
+					Value string `yaml:"value"`
+				} `yaml:"label"`
+				Entrypoint []string `yaml:"entrypoint"`
+				Script     *struct {
 					Command string   `yaml:"command"`
 					Cache   []string `yaml:"cache"`
 				} `yaml:"script"`
@@ -37,7 +46,8 @@ type Step struct {
 					Src  string `yaml:"src"`
 					Dst  string `yaml:"dst"`
 				} `yaml:"copy"`
-				Arg string `yaml:"arg"`
+				Arg     string `yaml:"arg"`
+				Workdir string `yaml:"workdir"`
 			} `yaml:"steps"`
 		} `yaml:"stages"`
 
@@ -101,6 +111,8 @@ func (step *Step) CompileDockerfile(output *dockerfile.Output) error {
 				}
 
 				s.Step(script)
+			case stageStep.Env != nil:
+				s.Step(dockerstep.Env(stageStep.Env.Key, stageStep.Env.Value))
 			case stageStep.Copy != nil:
 				copyStep := dockerstep.Copy(stageStep.Copy.Src, stageStep.Copy.Dst)
 				if stageStep.Copy.From != "" {
@@ -108,6 +120,17 @@ func (step *Step) CompileDockerfile(output *dockerfile.Output) error {
 				}
 
 				s.Step(copyStep)
+			case stageStep.Workdir != "":
+				s.Step(dockerstep.WorkDir(stageStep.Workdir))
+			case len(stageStep.Entrypoint) != 0:
+				args := []string{}
+				if len(stageStep.Entrypoint) > 1 {
+					args = stageStep.Entrypoint[1:]
+				}
+
+				s.Step(dockerstep.Entrypoint(stageStep.Entrypoint[0], args...))
+			case stageStep.Label != nil:
+				s.Step(dockerstep.Label(stageStep.Label.Key, stageStep.Label.Value))
 			}
 		}
 	}
